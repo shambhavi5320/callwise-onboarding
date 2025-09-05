@@ -1,4 +1,4 @@
-name: CI
+name: CI Deployment
 
 on:
   push:
@@ -6,41 +6,48 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
+      # Checkout your repo
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Extract Incident Number from Commit
+      # Extract Incident Number (looks for INC followed by digits in commit message)
+      - name: Extract Incident Number
         id: extract_incident
         run: |
-          # Get latest commit message
-          COMMIT_MSG=$(git log -1 --pretty=%B)
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
           echo "Commit message: $COMMIT_MSG"
-
-          # Extract Incident ID (pattern: INC followed by digits)
-          INCIDENT_ID=$(echo "$COMMIT_MSG" | grep -oE 'INC[0-9]+')
-
-          if [ -z "$INCIDENT_ID" ]; then
-            echo "No incident ID found in commit message!"
-            INCIDENT_ID="NO_INC_FOUND"
+          INCIDENT=$(echo "$COMMIT_MSG" | grep -oE 'INC[0-9]+')
+          if [ -z "$INCIDENT" ]; then
+            INCIDENT="UNKNOWN"
           fi
+          echo "incident_number=$INCIDENT" >> $GITHUB_OUTPUT
 
-          echo "incident_id=$INCIDENT_ID" >> $GITHUB_OUTPUT
-
-      - name: Trigger ServiceNow Webhook
+      # Example: Run your build/tests
+      - name: Run tests
         run: |
-          DEPLOYMENT_ID=${{ steps.extract_incident.outputs.incident_id }}
-          echo "Deployment ID: $DEPLOYMENT_ID"
+          echo "Running tests..."
+          # put your test/build commands here
+          echo "Tests complete."
 
+      # Always call ServiceNow with FAILURE if something breaks
+      - name: Send Deployment Event (Failure)
+        if: failure()
+        run: |
           curl -X POST \
             -H "Content-Type: application/json" \
-            -d "{
-              \"deployment_id\": \"$DEPLOYMENT_ID\",
-              \"status\": \"failure\",
-              \"repo\": \"${{ github.repository }}\",
-              \"commit\": \"${{ github.sha }}\"
-            }" \
-            https://dev284803.service-now.com/api/622834/github_ci_webhook/webhook
+            -u "github_integration:${{ secrets.SERVICENOW_TOKEN }}" \
+            -d "{\"deployment_id\":\"${{ steps.extract_incident.outputs.incident_number }}\",\"status\":\"failure\",\"repo\":\"${{ github.repository }}\",\"commit\":\"${{ github.sha }}\"}" \
+            "https://dev284803.service-now.com/api/622834/github_ci_webhook/webhook"
+
+      # Call ServiceNow with SUCCESS if job passed
+      - name: Send Deployment Event (Success)
+        if: success()
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -u "github_integration:${{ secrets.SERVICENOW_TOKEN }}" \
+            -d "{\"deployment_id\":\"${{ steps.extract_incident.outputs.incident_number }}\",\"status\":\"success\",\"repo\":\"${{ github.repository }}\",\"commit\":\"${{ github.sha }}\"}" \
+            "https://dev284803.service-now.com/api/622834/github_ci_webhook/webhook"
