@@ -9,19 +9,26 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Extract Deployment ID
+      - name: Extract Incident Number from commit message
+        id: extract_incident
         run: |
-          echo "DEPLOYMENT_ID=${GITHUB_SHA}" >> $GITHUB_ENV
-      - name: Print Deployment ID
-        run: echo "Deployment ID is $DEPLOYMENT_ID"
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+          # Extract pattern like INC followed by numbers
+          INCIDENT=$(echo "$COMMIT_MSG" | grep -oE 'INC[0-9]+')
+          if [ -z "$INCIDENT" ]; then
+            echo "No Incident Number found in commit!"
+            exit 1
+          fi
+          echo "INCIDENT=$INCIDENT" >> $GITHUB_ENV
 
-      - name: Notify ServiceNow
+      - name: Notify ServiceNow with Deployment ID
         run: |
           curl -X POST \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.SNOW_TOKEN }}" \
-            -d "{\"deployment_id\": \"$DEPLOYMENT_ID\", \"incident_number\": \"INC0010002\"}" \
-            https://your-servicenow-instance/api/endpoint
+            -u "${{ secrets.SNOW_USER }}:${{ secrets.SNOW_PASS }}" \
+            -d "{\"deployment_id\": \"$INCIDENT\", \"status\": \"in_progress\"}" \
+            "https://<YOUR_INSTANCE>.service-now.com/api/622834/github_ci_webhook/webhook"
