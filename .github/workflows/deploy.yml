@@ -28,7 +28,7 @@ jobs:
       # Example: Run your build/tests
       - name: Run tests
         run: |
-          echo "Running tests..."
+          echo "Running tests........"
           # put your test/build commands here
           echo "Tests complete."
 
