@@ -20,7 +20,7 @@ jobs:
           # Extract pattern like INC followed by numbers
           INCIDENT=$(echo "$COMMIT_MSG" | grep -oE 'INC[0-9]+')
           if [ -z "$INCIDENT" ]; then
-            echo "No Incident Number found in commit!"
+            echo "No Incident Number found in commit please recheck!"
             exit 1
           fi
           echo "INCIDENT=$INCIDENT" >> $GITHUB_ENV
