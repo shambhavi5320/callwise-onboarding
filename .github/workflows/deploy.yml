@@ -13,7 +13,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Extract Incident Number (looks for INC followed by digits in commit message)
+      # Extract Incident Number (looks for INC followed by digits in commit message for the flow)
       - name: Extract Incident Number
         id: extract_incident
         run: |
